@@ -281,3 +281,127 @@
 ## 5. API-проверки
 
 ### Запрос 1: Успешное создание заявки
+
+POST /api/tickets
+Authorization: Bearer <user_token>
+Content-Type: application/json
+
+{
+"name": "Иван Петров",
+"phone": "+79161234567",
+"email": "ivan@example.com",
+"comment": "Тестовая заявка",
+"age": 30
+}
+
+
+| Параметр | Значение |
+|----------|----------|
+| **Ожидаемый статус** | `201 Created` |
+| **Что проверяем** | `data.status == "new"`, `data.name == "Иван Петров"`, наличие `data.id` (число > 0), `data.createdAt` (ISO 8601) |
+
+---
+
+### Запрос 2: Валидация name (1 символ)
+
+POST /api/tickets
+Authorization: Bearer <user_token>
+Content-Type: application/json
+
+{
+"name": "A",
+"phone": "+79161234567"
+}
+
+
+| Параметр | Значение |
+|----------|----------|
+| **Ожидаемый статус** | `422 Unprocessable Entity` |
+| **Что проверяем** | `errors.name` содержит текст "от 2 до 50" или "минимум 2", ответ — JSON, нет поля `data` |
+
+---
+
+### Запрос 3: Попытка смены статуса пользователем
+
+PATCH /api/tickets/1
+Authorization: Bearer <user_token>
+Content-Type: application/json
+
+{
+"status": "done"
+}
+
+
+| Параметр | Значение |
+|----------|----------|
+| **Ожидаемый статус** | `403 Forbidden` или `422` |
+| **Что проверяем** | Сообщение об ошибке содержит "доступ" / "запрещено" / "нельзя менять статус" |
+
+---
+
+### Запрос 4: Админ: done → new (должен быть запрет)
+
+PATCH /api/tickets/1
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+"status": "new"
+}
+
+
+| Параметр | Значение |
+|----------|----------|
+| **Ожидаемый статус** | `422 Unprocessable Entity` |
+| **Что проверяем** | `error` / `message` содержит "нельзя" и "done" и "new" |
+
+---
+
+### Запрос 5: Доступ к чужой заявке
+
+GET /api/tickets/999
+Authorization: Bearer <user_token>
+
+
+| Параметр | Значение |
+|----------|----------|
+| **Ожидаемый статус** | `404 Not Found` (предпочтительно) |
+| **Что проверяем** | Ответ не содержит данных заявки, есть сообщение "не найдена" |
+
+---
+
+### Запрос 6: Редактирование в cancelled
+
+PATCH /api/tickets/42
+Authorization: Bearer <user_token_owner>
+Content-Type: application/json
+
+{
+"comment": "Попытка изменить отменённую заявку"
+}
+
+
+| Параметр | Значение |
+|----------|----------|
+| **Ожидаемый статус** | `422 Unprocessable Entity` |
+| **Что проверяем** | `error` содержит "отменён" / "cancelled" и "нельзя редактировать" |
+
+---
+
+### Запрос 7: comment = 500 символов (граница)
+
+POST /api/tickets
+Authorization: Bearer <user_token>
+Content-Type: application/json
+
+{
+"name": "Граничный тест",
+"phone": "+79999999999",
+"comment": "AAAAAAAAAA... (500 символов)"
+}
+
+
+| Параметр | Значение |
+|----------|----------|
+| **Ожидаемый статус** | `201 Created` |
+| **Что проверяем** | `data.comment.length == 500`, комментарий сохранён полностью, без обрезки |
